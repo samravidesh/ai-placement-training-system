@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("NEON_DATABASE_URL")
+}
+
+model User {
+  id                  Int                  @id @default(autoincrement())
+  name                String               @default("New User") @db.VarChar(120)
+  email               String               @unique @db.VarChar(255)
+  password            String
+  branch              String               @default("Not specified") @db.VarChar(120)
+  education_level     String               @default("Not specified") @db.VarChar(120)
+  interest_type       String               @default("tech") @db.VarChar(20)
+  onboarding_completed Boolean             @default(false)
+  created_at          DateTime?            @default(now()) @db.Timestamp(6)
+
+  skill_assessment    SkillAssessment?
+  user_profile        UserProfile?
+  job_applications    JobApplication[]
+  course_assignments  CourseAssignment[]   @relation("CourseAssignmentsUser")
+  workshop_assignments WorkshopAssignment[] @relation("WorkshopAssignmentsUser")
+  training_plans      TrainingPlan[]
+  assigned_courses    CourseAssignment[]   @relation("CourseAssignmentsAssignedBy")
+  assigned_workshops  WorkshopAssignment[] @relation("WorkshopAssignmentsAssignedBy")
+
+  @@map("users")
+}
+
+model SkillAssessment {
+  id                        Int       @id @default(autoincrement())
+  user_id                   Int       @unique
+  aptitude_score            Decimal   @db.Decimal(5, 2)
+  communication_score       Decimal   @db.Decimal(5, 2)
+  psychometric_score        Decimal   @db.Decimal(5, 2)
+  overall_rating            Decimal   @db.Decimal(5, 2)
+  profile_rating_percentage Decimal   @db.Decimal(5, 2)
+  created_at                DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                DateTime? @default(now()) @db.Timestamp(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("skill_assessments")
+}
+
+model Job {
+  id              Int              @id @default(autoincrement())
+  company_name    String           @db.VarChar(180)
+  job_role        String           @db.VarChar(180)
+  package_offered Decimal          @db.Decimal(10, 2)
+  job_type        String           @db.VarChar(100)
+  required_skills String
+  location        String           @db.VarChar(180)
+  interest_type   String           @db.VarChar(20)
+  created_at      DateTime?        @default(now()) @db.Timestamp(6)
+
+  job_applications JobApplication[]
+
+  @@map("jobs")
+}
+
+model JobApplication {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  job_id     Int
+  status     String    @default("applied") @db.VarChar(50)
+  applied_at DateTime? @default(now()) @db.Timestamp(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, job_id])
+  @@map("job_applications")
+}
+
+model CompanyAnalytics {
+  id                        Int       @id @default(autoincrement())
+  company_name              String    @db.VarChar(180)
+  total_hires_last_3_years  Int
+  average_package           Decimal   @db.Decimal(10, 2)
+  roles_offered             String[]
+  created_at                DateTime? @default(now()) @db.Timestamp(6)
+
+  @@map("company_analytics")
+}
+
+model TrainingCourse {
+  id                 Int                @id @default(autoincrement())
+  course_name        String             @db.VarChar(180)
+  description        String
+  duration_weeks     Int
+  level              String             @default("beginner") @db.VarChar(60)
+  provider           String             @default("Internal") @db.VarChar(120)
+  category           String             @default("General") @db.VarChar(80)
+  course_link        String?
+  created_at         DateTime?          @default(now()) @db.Timestamp(6)
+
+  course_assignments CourseAssignment[]
+
+  @@map("training_courses")
+}
+
+model CourseAssignment {
+  id                    Int       @id @default(autoincrement())
+  user_id               Int
+  course_id             Int
+  assigned_by           Int?
+  start_date            DateTime? @db.Date
+  target_end_date       DateTime? @db.Date
+  status                String    @default("assigned") @db.VarChar(50)
+  completion_percentage Decimal   @default(0) @db.Decimal(5, 2)
+  assigned_at           DateTime? @default(now()) @db.Timestamp(6)
+
+  user             User          @relation("CourseAssignmentsUser", fields: [user_id], references: [id], onDelete: Cascade)
+  course           TrainingCourse @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  assigned_by_user User?         @relation("CourseAssignmentsAssignedBy", fields: [assigned_by], references: [id], onDelete: SetNull)
+
+  @@unique([user_id, course_id])
+  @@map("course_assignments")
+}
+
+model TrainingPlan {
+  id              Int       @id @default(autoincrement())
+  user_id         Int
+  month_no        Int
+  module_title    String    @db.VarChar(200)
+  key_outcomes    String
+  workshop_module String    @db.VarChar(200)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, month_no])
+  @@map("training_plans")
+}
+
+model Workshop {
+  id                  Int                  @id @default(autoincrement())
+  title               String               @db.VarChar(180)
+  description         String
+  scheduled_date      DateTime?            @db.Date
+  duration_hours      Decimal?             @db.Decimal(6, 2)
+  mode                String               @default("offline") @db.VarChar(60)
+  created_at          DateTime?            @default(now()) @db.Timestamp(6)
+
+  workshop_assignments WorkshopAssignment[]
+
+  @@map("workshops")
+}
+
+model WorkshopAssignment {
+  id                    Int       @id @default(autoincrement())
+  user_id               Int
+  workshop_id           Int
+  assigned_by           Int?
+  status                String    @default("assigned") @db.VarChar(50)
+  completion_percentage Decimal   @default(0) @db.Decimal(5, 2)
+  assigned_at           DateTime? @default(now()) @db.Timestamp(6)
+
+  user             User      @relation("WorkshopAssignmentsUser", fields: [user_id], references: [id], onDelete: Cascade)
+  workshop         Workshop  @relation(fields: [workshop_id], references: [id], onDelete: Cascade)
+  assigned_by_user User?     @relation("WorkshopAssignmentsAssignedBy", fields: [assigned_by], references: [id], onDelete: SetNull)
+
+  @@unique([user_id, workshop_id])
+  @@map("workshop_assignments")
+}
+
+model UserProfile {
+  id         Int       @id @default(autoincrement())
+  user_id    Int       @unique
+  profile    Json
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model RecommendationVector {
+  id                   Int       @id @default(autoincrement())
+  document_key         String    @unique @db.VarChar(255)
+  document_type        String    @db.VarChar(20)
+  source_id            Int
+  interest_type        String?   @db.VarChar(20)
+  title                String    @db.VarChar(255)
+  content              String
+  metadata             Json
+  embedding_model      String    @db.VarChar(120)
+  embedding            Json?
+  embedding_dimensions Int       @default(0)
+  content_hash         String    @db.VarChar(64)
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+  updated_at           DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([document_type, source_id], map: "idx_recommendation_vectors_type_source")
+  @@index([interest_type], map: "idx_recommendation_vectors_interest")
+  @@map("recommendation_vectors")
+}
